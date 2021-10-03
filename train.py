@@ -101,7 +101,7 @@ def main():
     # dataset
     if args.dataset == 'cifar10':
         num_classes = 10
-        data_root = os.path.join(args.root, 'cifar10')
+        data_root = args.root
         # train
         train_dataset = torchvision.datasets.CIFAR10(
                             root=data_root, 
