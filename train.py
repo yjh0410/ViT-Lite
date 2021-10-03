@@ -309,7 +309,7 @@ def main():
             print('saving the model ...')
             torch.save(model.state_dict(), 
                 os.path.join(path_to_save, 
-                args.version + '_' + str(epoch + 1) + '_' + str(round(acc1.item())) + '.pth'))
+                'vit_' + str(epoch + 1) + '_' + str(round(acc1.item())) + '.pth'))
 
 
 def validate(device, val_loader, model, criterion):
