@@ -1,6 +1,6 @@
 python train.py --cuda \
                 -d imagenet \
-                --root /home/k545/datasets/imagenet/ \
+                --root /home/k545/datasets/ \
                 --optimizer adamw \
                 --learning_rate 0.001 \
                 --max_epoch 300 \
