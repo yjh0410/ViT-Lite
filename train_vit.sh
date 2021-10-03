@@ -1,5 +1,6 @@
 python train.py --cuda \
                 -d cifar10 \
+                --root /home/k545/datasets/cifar10/ \
                 --optimizer adamw \
                 --learning_rate 0.001 \
                 --max_epoch 90 \
