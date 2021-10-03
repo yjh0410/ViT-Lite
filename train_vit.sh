@@ -1,0 +1,16 @@
+python train.py --cuda \
+                -d cifar10 \
+                --optimizer adamw \
+                --learning_rate 0.001 \
+                --max_epoch 90 \
+                --batch_size 256 \
+                --lr_schedule cos \
+                --img_size 224 \
+                --num_patch 16 \
+                --dim 256 \
+                --depth 4 \
+                --heads 4 \
+                --dim_head 64 \
+                --channels 3 \
+                --mlp_dim 256 \
+                --pool cls 

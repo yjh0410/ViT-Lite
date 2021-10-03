@@ -9,7 +9,7 @@ from utils.modules import Transformer
 class ViT(nn.Module):
     def __init__(self,
                  img_size, 
-                 patch_size,
+                 num_patch,
                  num_classes,
                  dim,
                  depth,
@@ -22,11 +22,11 @@ class ViT(nn.Module):
                  emb_dropout=0.):
         super().__init__()
         image_h, image_w = img_size, img_size
-        patch_h, patch_w = patch_size, patch_size
+        patch_h, patch_w = image_h // num_patch, image_w // num_patch
 
-        assert image_h % patch_h == 0 and image_w % patch_w == 0
+        assert image_h % num_patch == 0 and image_w % num_patch == 0
 
-        num_patch = (image_h // patch_h) * (image_w // patch_w)
+        num_patch = num_patch ** 2
         patch_dim = channels * patch_h * patch_w
         assert pool in {'cls', 'mean'}, 'pool type must be either cls (cls token) or mean (mean pooling)'
 
@@ -71,4 +71,3 @@ class ViT(nn.Module):
         x = self.to_latent(x)
 
         return self.mlp_head(x)
-        

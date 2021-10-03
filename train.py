@@ -9,6 +9,7 @@ import time
 import math
 import argparse
 
+from models.vit import ViT
 from utils.modules import ModelEMA
 from utils.com_flops_params import FLOPs_and_Params
 
@@ -46,9 +47,26 @@ def parse_args():
     parser.add_argument('--root', type=str, default='/mnt/share/ssd2/dataset',
                         help='cifar10, imagenet')
 
-    # model
-    parser.add_argument('-v', '--version', type=str, default='vit',
-                        help='vit, swin-tr')
+    # model config
+    parser.add_argument('-size', '--img_size', type=int, default=224,
+                        help='input size')
+    parser.add_argument('--num_patch', type=int, default=16,
+                        help='input size')
+    parser.add_argument('--dim', type=int, default=256,
+                        help='patch dim')
+    parser.add_argument('--depth', type=int, default=4,
+                        help='the number of encoder in transformer')
+    parser.add_argument('--heads', type=int, default=8,
+                        help='the number of multi-head in transformer')
+    parser.add_argument('--dim_head', type=int, default=64,
+                        help='the number of dim of each head in transformer')
+    parser.add_argument('--channels', type=int, default=3,
+                        help='the number of image channel')
+    parser.add_argument('--mlp_dim', type=int, default=256,
+                        help='the number of dim in FFN')
+    parser.add_argument('--pool', type=str, default='cls',
+                        help='cls or mean')
+
 
     return parser.parse_args()
 
@@ -156,14 +174,26 @@ def main():
     print('total train data size : ', len(train_dataset))
 
     # build model
-    model = RocketNet(model_size=args.version, num_classes=num_classes)
+    model = ViT(
+        img_size=args.img_size,
+        num_patch=args.num_patch,
+        num_classes=num_classes,
+        dim=args.dim,
+        depth=args.depth,
+        mlp_dims=args.mlp_dim,
+        heads=args.heads,
+        dim_head=args.dim_head,
+        pool=args.pool,
+        channels=args.channels,
+        dropout=0.5,
+        emb_dropout=0.5
+    )
 
     model.train().to(device)
     ema = ModelEMA(model) if args.ema else None
 
     # compute FLOPs and Params
-    size = 32 if args.dataset == 'cifar10' else 224
-    FLOPs_and_Params(model=model, size=size)
+    FLOPs_and_Params(model=model, size=args.img_size)
 
     # basic setup
     best_acc1 = 0.0
