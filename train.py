@@ -9,7 +9,6 @@ import time
 import math
 import argparse
 
-from models.rocketnet import RocketNet
 from utils.modules import ModelEMA
 from utils.com_flops_params import FLOPs_and_Params
 
@@ -48,8 +47,8 @@ def parse_args():
                         help='cifar10, imagenet')
 
     # model
-    parser.add_argument('-v', '--version', type=str, default='1.0x',
-                        help='0.5x, 1.0x, 1.5x, 2.0x')
+    parser.add_argument('-v', '--version', type=str, default='vit',
+                        help='vit, swin-tr')
 
     return parser.parse_args()
 
@@ -186,6 +185,9 @@ def main():
     elif args.optimizer == 'adam':
         optimizer = optim.Adam(model.parameters(), 
                                 lr=base_lr)
+    elif args.optimizer == 'adamw':
+        optimizer = optim.AdamW(model.parameters(),
+                                )
     else:
         print('Unknow optimizer !!!')
 

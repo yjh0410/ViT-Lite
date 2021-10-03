@@ -3,7 +3,8 @@ import torch.nn as nn
 from copy import deepcopy
 import math
 
-from torch.nn.modules.pooling import AvgPool2d
+from einops import rearrange, repeat
+
 
 
 def is_parallel(model):
@@ -28,120 +29,99 @@ def channel_shuffle(x, groups):
     return x
 
 
-class Conv(nn.Module):
-    def __init__(self, c1, c2, k, s=1, p=0, d=1, g=1, act='relu'):
-        super(Conv, self).__init__()
-        if act is not None:
-            if act == 'relu':
-                self.convs = nn.Sequential(
-                    nn.Conv2d(c1, c2, k, stride=s, padding=p, dilation=d, groups=g, bias=False),
-                    nn.BatchNorm2d(c2),
-                    nn.ReLU(inplace=True) if act else nn.Identity()
-                )
-            elif act == 'leaky':
-                self.convs = nn.Sequential(
-                    nn.Conv2d(c1, c2, k, stride=s, padding=p, dilation=d, groups=g, bias=False),
-                    nn.BatchNorm2d(c2),
-                    nn.LeakyReLU(0.1, inplace=True) if act else nn.Identity()
-                )
-        else:
-            self.convs = nn.Sequential(
-                nn.Conv2d(c1, c2, k, stride=s, padding=p, dilation=d, groups=g, bias=False),
-                nn.BatchNorm2d(c2)
-            )
-
-    def forward(self, x):
-        return self.convs(x)
-
-
-class BasicBlockv1(nn.Module):
-    def __init__(self, c):
+class PreNorm(nn.Module):
+    def __init__(self, dim, fn):
         super().__init__()
-        c_ = c // 2
-        self.cv1 = Conv(c_, c_, k=1)
-        self.cv2 = Conv(c_, c_, k=3, p=1, g=c_, act=None)
-        self.cv3 = Conv(c_, c_, k=1)
-
-    def forward(self, x):
-        x1, x2 = torch.chunk(x, 2, dim=1)
-        x2 = self.cv3(self.cv2(self.cv1(x2)))
-        y = torch.cat([x1, x2], dim=1)
-
-        return channel_shuffle(y, 2)
+        self.norm = nn.LayerNorm(dim)
+        self.fn = fn
+    def forward(self, x, **kwargs):
+        # 使用residual连结
+        return self.norm(self.fn(x, **kwargs) + x)
+        # return self.fn(self.norm(x), **kwargs)
 
 
-class ShuffleBlockv1(nn.Module):
-    def __init__(self, c, n=1):
+# FFN
+class FeedForward(nn.Module):
+    def __init__(self, dim, hidden_dim, dropout = 0.):
         super().__init__()
-        branch = [BasicBlockv1(c) for _ in range(n)]
-        self.branch = nn.Sequential(*branch)
-
-    def forward(self, x):
-        return self.branch(x)
-
-
-class ShuffleBlockv2(nn.Module):
-    # ShuffleBlock with Downsample
-    def __init__(self, c1, c2, s=2):
-        super().__init__()
-        c_ = c2 // 2
-        # branch-1
-        self.cv1_1 = Conv(c1, c1, k=3, p=1, s=s, g=c1, act=None)
-        self.cv1_2 = Conv(c1, c_, k=1)
-        # branch-2
-        self.cv2_1 = Conv(c1, c_, k=1)
-        self.cv2_2 = Conv(c_, c_, k=3, p=1, s=s, g=c_, act=None)
-        self.cv2_3 = Conv(c_, c_, k=1)
-
-    def forward(self, x):
-        # branch-1
-        x1 = self.cv1_2(self.cv1_1(x))
-        x2 = self.cv2_3(self.cv2_2(self.cv2_1(x)))
-        y = torch.cat([x1, x2], dim=1)
-        
-        return channel_shuffle(y, 2)
-
-
-class BottleneckDW(nn.Module):
-    # Depth-wise bottleneck
-    def __init__(self, c1, c2, s=1, shortcut=False, act='relu', e=1.0):
-        super(BottleneckDW, self).__init__()
-        c_ = int(c1 * e)
-        self.h1 = nn.Sequential(
-            Conv(c1, c_, k=1, act=act),
-            Conv(c_, c_, k=3, p=1, s=s, g=c_, act=None),
-            Conv(c_, c2, k=1, act=act)
+        self.net = nn.Sequential(
+            nn.Linear(dim, hidden_dim),
+            nn.GELU(),
+            nn.Dropout(dropout),
+            nn.Linear(hidden_dim, dim),
+            nn.Dropout(dropout)
         )
-        self.shortcut = shortcut and s == 1
-        if self.shortcut:
-            self.h2 = nn.Identity()
-        else:
-            self.h2 = nn.Sequential(
-                Conv(c1, c2, k=1, act='relu'),
-                nn.AvgPool2d(2, 2)
-            )
+    def forward(self, x):
+        return self.net(x)
+
+
+# Attention
+class Attention(nn.Module):
+    def __init__(self, 
+                 dim,            # 输入X的特征长度
+                 heads=8,        # multi-head的个数
+                 dim_head = 64,  # 每个head的dim
+                 dropout = 0.):
+        super().__init__()
+        inner_dim = dim_head *  heads
+        # 这个判断条件就是multi-head还是single-head
+        # 如果是multi-head，那么project_out = True，即把多个head输出的q拼在一起再用FC处理一次
+        # 如果是single-head，则 = False，不需要拼接q，也就不需要FC处理了
+        project_out = not (heads == 1 and dim_head == dim)
+
+        self.heads = heads
+        self.scale = dim_head ** -0.5     # sqrt(d_k)
+
+        self.attend = nn.Softmax(dim = -1)
+        self.to_qkv = nn.Linear(dim, inner_dim * 3, bias = False) # W_q, W_k, W_v
+
+        self.to_out = nn.Sequential(
+            nn.Linear(inner_dim, dim),
+            nn.Dropout(dropout)
+        ) if project_out else nn.Identity()
 
     def forward(self, x):
-        h1 = self.h1(x)
-        h2 = self.h2(x)
-        return h1 + h2
+        # 输入：x -> [B, N, C1]
+        # self.to_qkv一次得到Q,K,V三个变量，然后用chunk拆分成三分，每个都是[B, N, h*d]
+        # 这里，M = N
+        qkv = self.to_qkv(x).chunk(3, dim = -1)
+        # 使用爱因斯坦求和方式来改变shape：[B, N, h*d] -> [B, h, N, d]
+        # 其中h=heads，即multi-head的个数
+        q, k, v = map(lambda t: rearrange(t, 'b n (h d) -> b h n d', h = self.heads), qkv)
+        # Q*K^T / sqrt(d_k) : [B, h, N, d] X [B, h, d, N] = [B, h, N, N]
+        dots = torch.matmul(q, k.transpose(-1, -2)) * self.scale
+        # 使用softmax求概率
+        attn = self.attend(dots)
+        # 自注意力机制：softmax(Q*K^T / sqrt(d_k)) * V ：[B, h, N, N] X [B, h, N, d] = [B, h, N, d]
+        out = torch.matmul(attn, v)
+        # 改变shape：[B, h, N, d] -> [B, N, h*d]=[B, N, C2], C2 = h*d
+        out = rearrange(out, 'b h n d -> b n (h d)')
+        
+        return self.to_out(out)
 
 
-class CSPBlockDW(nn.Module):
-    # Depth-wise CSPBlock
-    def __init__(self, c, n=1, shortcut=False, act='relu'):
-        super(CSPBlockDW, self).__init__()
-        c_ = c // 2
-        branch = [BottleneckDW(c_, c_, shortcut=shortcut, act=act) for _ in range(n)]
-        self.branch = nn.Sequential(*branch)
-        self.conv = Conv(c_ * 2, c, k=1)
-
+# Transformer
+class Transformer(nn.Module):
+    def __init__(self, 
+                 dim,            # 输入X的特征长度
+                 depth,          # Encoder的层数
+                 heads,          # multi-head的个数
+                 dim_head,       # 每个head的dim
+                 mlp_dim,        # FFN中的dim
+                 dropout = 0.):
+        super().__init__()
+        self.layers = nn.ModuleList([])
+        for _ in range(depth):
+            self.layers.append(nn.ModuleList([
+                PreNorm(dim, Attention(dim, heads = heads, dim_head = dim_head, dropout = dropout)),
+                PreNorm(dim, FeedForward(dim, mlp_dim, dropout = dropout))
+            ]))
     def forward(self, x):
-        x1, x2 = torch.chunk(x, chunks=2, dim=1)
-        x2 = self.branch(x2)
-        y = torch.cat([x1, x2], dim=1)
-
-        return self.conv(y)
+        for attn, ff in self.layers:
+            # 注意，PreNorm里内部已经做了residual。
+            x = attn(x) 
+            x = ff(x)
+        return x
 
 
 class ModelEMA(object):
