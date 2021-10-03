@@ -74,7 +74,7 @@ def parse_args():
 def main():
     args = parse_args()
 
-    path_to_save = os.path.join(args.path_to_save, args.dataset, args.version)
+    path_to_save = os.path.join(args.path_to_save, args.dataset, 'vit')
     os.makedirs(path_to_save, exist_ok=True)
     
     # use cuda
