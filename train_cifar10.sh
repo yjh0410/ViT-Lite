@@ -6,12 +6,12 @@ python train.py --cuda \
                 --max_epoch 90 \
                 --batch_size 256 \
                 --lr_schedule cos \
-                --img_size 224 \
-                --num_patch 16 \
+                --img_size 32 \
+                --num_patch 4 \
                 --dim 256 \
                 --depth 4 \
                 --heads 4 \
-                --dim_head 64 \
+                --dim_head 32 \
                 --channels 3 \
                 --mlp_dim 256 \
                 --pool cls 
