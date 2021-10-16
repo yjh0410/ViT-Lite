@@ -172,7 +172,7 @@ def main():
         img_size=args.img_size,
         num_patch=args.num_patch,
         num_classes=num_classes,
-        hidden_dim=args.dim,
+        hidden_dim=args.hidden_dim,
         num_encoders=5,
         num_heads=8,
         mlp_dim=args.mlp_dim,
