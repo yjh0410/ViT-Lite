@@ -188,6 +188,7 @@ def main():
     best_acc1 = 0.0
     base_lr = args.lr
     tmp_lr = base_lr
+    wp_epoch = 5
     max_epoch = args.max_epoch
     epoch_size = len(train_dataset) // args.batch_size
 
@@ -213,14 +214,13 @@ def main():
         for iter_i, (images, target) in enumerate(train_loader):
             ni = iter_i + epoch * epoch_size
             # warmup
-            if epoch < 1 and warmup:
-                nw = 1 * epoch_size
+            if epoch < wp_epoch:
+                nw = wp_epoch * epoch_size
                 tmp_lr = base_lr * pow(ni / nw, 4)
                 set_lr(optimizer, tmp_lr)
 
-            elif epoch == 1 and iter_i == 0 and warmup:
+            elif epoch == wp_epoch and iter_i == 0:
                 # warmup is over
-                warmup = False
                 tmp_lr = base_lr
                 set_lr(optimizer, tmp_lr)
                 
