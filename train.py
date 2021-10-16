@@ -21,17 +21,17 @@ def parse_args():
                         help='use cuda')
     parser.add_argument('--batch_size', type=int,
                         default=256, help='batch size')
-    parser.add_argument('--max_epoch', type=int, default=90, 
+    parser.add_argument('--max_epoch', type=int, default=120, 
                         help='max epoch')
     parser.add_argument('--num_workers', type=int, default=8,
                         help='number of workers')
-    parser.add_argument('--learning_rate', type=float,
-                        default=0.1, help='learning rate for training model')
+    parser.add_argument('--lr', type=float,
+                        default=0.001, help='learning rate for training model')
     parser.add_argument('--path_to_save', type=str, 
                         default='weights/')
     parser.add_argument('--tfboard', action='store_true', default=False,
                         help='use tensorboard')
-    parser.add_argument('--optimizer', type=str, default='sgd',
+    parser.add_argument('--optimizer', type=str, default='adamw',
                         help='sgd, adam')
     parser.add_argument('--ema', action='store_true', default=False,
                         help='use ema.')
@@ -52,20 +52,16 @@ def parse_args():
                         help='input size')
     parser.add_argument('--num_patch', type=int, default=16,
                         help='input size')
-    parser.add_argument('--dim', type=int, default=256,
+    parser.add_argument('--hidden_dim', type=int, default=256,
                         help='patch dim')
-    parser.add_argument('--depth', type=int, default=4,
+    parser.add_argument('--depth', type=int, default=5,
                         help='the number of encoder in transformer')
-    parser.add_argument('--heads', type=int, default=8,
+    parser.add_argument('--num_heads', type=int, default=8,
                         help='the number of multi-head in transformer')
     parser.add_argument('--dim_head', type=int, default=64,
                         help='the number of dim of each head in transformer')
-    parser.add_argument('--channels', type=int, default=3,
-                        help='the number of image channel')
-    parser.add_argument('--mlp_dim', type=int, default=256,
+    parser.add_argument('--mlp_dim', type=int, default=2048,
                         help='the number of dim in FFN')
-    parser.add_argument('--pool', type=str, default='cls',
-                        help='cls or mean')
 
 
     return parser.parse_args()
@@ -178,16 +174,11 @@ def main():
         img_size=args.img_size,
         num_patch=args.num_patch,
         num_classes=num_classes,
-        dim=args.dim,
-        depth=args.depth,
-        mlp_dims=args.mlp_dim,
-        heads=args.heads,
-        dim_head=args.dim_head,
-        pool=args.pool,
-        channels=args.channels,
-        dropout=0.5,
-        emb_dropout=0.5
-    )
+        hidden_dim=args.dim,
+        num_encoders=5,
+        num_heads=8,
+        mlp_dim=args.mlp_dim,
+        dropout=0.5)
 
     model.train().to(device)
     ema = ModelEMA(model) if args.ema else None
@@ -200,24 +191,13 @@ def main():
     base_lr = args.learning_rate
     tmp_lr = base_lr
     max_epoch = args.max_epoch
-    lr_step = [max_epoch//3, max_epoch*2//3]
     epoch_size = len(train_dataset) // args.batch_size
-    warmup = True
-    print('Max epoch: ', max_epoch)
-    print('Lr epoch: ', lr_step)
 
     # optimizer
-    if args.optimizer == 'sgd':
-        optimizer = optim.SGD(model.parameters(), 
-                            lr=base_lr, 
-                            momentum=0.9, 
-                            weight_decay=1e-4)
-    elif args.optimizer == 'adam':
-        optimizer = optim.Adam(model.parameters(), 
-                                lr=base_lr)
-    elif args.optimizer == 'adamw':
-        optimizer = optim.AdamW(model.parameters(),
-                                )
+    if args.optimizer == 'adamw':
+        optimizer = optim.AdamW(model.parameters(), 
+                                lr=args.lr,
+                                weight_decay=0.01)
     else:
         print('Unknow optimizer !!!')
 
@@ -227,24 +207,23 @@ def main():
     t0 = time.time()
     print("-------------- start training ----------------")
     for epoch in range(max_epoch):
-
-        # use lr step
-        if args.lr_schedule == 'step' and epoch in lr_step:
-            tmp_lr = tmp_lr * 0.1
-            for param_group in optimizer.param_groups:
-                param_group['lr'] = tmp_lr
-
         # use cos step
-        elif args.lr_schedule == 'cos':
-            tmp_lr = 1e-5 + 0.5*(base_lr - 1e-5)*(1 + math.cos(math.pi*epoch / max_epoch))
-            set_lr(optimizer, tmp_lr)
+        tmp_lr = 1e-5 + 0.5*(base_lr - 1e-5)*(1 + math.cos(math.pi*epoch / max_epoch))
+        set_lr(optimizer, tmp_lr)
 
         # train one epoch
         for iter_i, (images, target) in enumerate(train_loader):
             ni = iter_i + epoch * epoch_size
-            # use lr step
-            if args.lr_schedule == 'linear':
-                tmp_lr = base_lr * (1.0 - ni / (max_epoch * epoch_size))
+            # warmup
+            if epoch < 1 and warmup:
+                nw = 1 * epoch_size
+                tmp_lr = base_lr * pow(ni / nw, 4)
+                set_lr(optimizer, tmp_lr)
+
+            elif epoch == 1 and iter_i == 0 and warmup:
+                # warmup is over
+                warmup = False
+                tmp_lr = base_lr
                 set_lr(optimizer, tmp_lr)
                 
             # to tensor
