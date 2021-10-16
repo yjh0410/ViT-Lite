@@ -36,9 +36,7 @@ def parse_args():
     parser.add_argument('--ema', action='store_true', default=False,
                         help='use ema.')
     # lr schedule
-    parser.add_argument('--wp_iters', type=int, default=100,
-                        help='warmup iteration')
-    parser.add_argument('--lr_schedule', type=str, default='step',
+    parser.add_argument('--lr_schedule', type=str, default='cos',
                         help='step, linear, cos')
 
     # dataset
