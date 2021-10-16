@@ -10,7 +10,7 @@ class ViT(nn.Module):
                  num_patch,
                  num_classes,
                  hidden_dim=256,
-                 num_encoders=5,
+                 num_encoders=6,
                  num_heads=8,
                  mlp_dim=2048,
                  dropout=0.):
@@ -46,7 +46,9 @@ class ViT(nn.Module):
         x = x.view(B, C, -1).permute(0, 2, 1).contiguous()
         # transformer
         x = x + self.pos_embedding
+        print(x.size())
         x = self.transformer(x)
+        print(x.size())
         # classify
         x = x.mean(1)
         x = self.mlp_head(x)

@@ -52,7 +52,7 @@ def parse_args():
                         help='input size')
     parser.add_argument('--hidden_dim', type=int, default=256,
                         help='patch dim')
-    parser.add_argument('--depth', type=int, default=5,
+    parser.add_argument('--depth', type=int, default=6,
                         help='the number of encoder in transformer')
     parser.add_argument('--num_heads', type=int, default=8,
                         help='the number of multi-head in transformer')
@@ -173,8 +173,8 @@ def main():
         num_patch=args.num_patch,
         num_classes=num_classes,
         hidden_dim=args.hidden_dim,
-        num_encoders=5,
-        num_heads=8,
+        num_encoders=args.depth,
+        num_heads=args.num_heads,
         mlp_dim=args.mlp_dim,
         dropout=0.5)
 
