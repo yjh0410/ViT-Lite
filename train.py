@@ -186,7 +186,7 @@ def main():
 
     # basic setup
     best_acc1 = 0.0
-    base_lr = args.learning_rate
+    base_lr = args.lr
     tmp_lr = base_lr
     max_epoch = args.max_epoch
     epoch_size = len(train_dataset) // args.batch_size
