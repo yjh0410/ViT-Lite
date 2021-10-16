@@ -26,12 +26,12 @@ class ViT(nn.Module):
         # position embedding
         self.pos_embedding = nn.Parameter(torch.randn(1, N, hidden_dim))
         # transformer
-        self.transformer = TransformerEncoder(dim=hidden_dim, 
-                                              depth=num_encoders,
-                                              heads=num_heads,
-                                              dim_head=hidden_dim // num_heads, 
-                                              mlp_dim=mlp_dim, 
-                                              dropout=dropout)
+        self.encoder = TransformerEncoder(dim=hidden_dim, 
+                                          depth=num_encoders,
+                                          heads=num_heads,
+                                          dim_head=hidden_dim // num_heads, 
+                                          mlp_dim=mlp_dim, 
+                                          dropout=dropout)
         # output
         self.mlp_head = nn.Sequential(
             nn.LayerNorm(hidden_dim),
@@ -46,7 +46,7 @@ class ViT(nn.Module):
         x = x.view(B, C, -1).permute(0, 2, 1).contiguous()
         # transformer
         x = x + self.pos_embedding
-        x = self.transformer(x)
+        x = self.encoder(x)
         # classify
         x = x.mean(1)
         x = self.mlp_head(x)
