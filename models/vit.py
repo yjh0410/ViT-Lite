@@ -48,5 +48,6 @@ class ViT(nn.Module):
         x = x + self.pos_embedding
         x = self.transformer(x)
         # classify
+        x = x.mean(1)
         x = self.mlp_head(x)
         return x

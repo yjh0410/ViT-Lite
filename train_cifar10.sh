@@ -3,4 +3,4 @@ python train.py --cuda \
                 --max_epoch 120 \
                 --batch_size 256 \
                 --img_size 32 \
-                --num_patch 4 \
+                --num_patch 16 \
