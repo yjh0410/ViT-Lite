@@ -41,15 +41,12 @@ class ViT(nn.Module):
     def forward(self, x):
         # [B, 3, H, W] -> [B, N, dim]
         x = self.patch_embedding(x)
-        print(x.size())
         B, C = x.shape[:2]
 
         x = x.view(B, C, -1).permute(0, 2, 1).contiguous()
         # transformer
         x = x + self.pos_embedding
-        print(x.size())
         x = self.transformer(x)
-        print(x.size())
         # classify
         x = x.mean(1)
         x = self.mlp_head(x)
