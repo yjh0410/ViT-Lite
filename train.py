@@ -50,7 +50,7 @@ def parse_args():
                         help='input size')
     parser.add_argument('--num_patch', type=int, default=16,
                         help='input size')
-    parser.add_argument('--hidden_dim', type=int, default=256,
+    parser.add_argument('--hidden_dim', type=int, default=128,
                         help='patch dim')
     parser.add_argument('--depth', type=int, default=6,
                         help='the number of encoder in transformer')
