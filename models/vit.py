@@ -41,6 +41,9 @@ class ViT(nn.Module):
     def forward(self, x):
         # [B, 3, H, W] -> [B, N, dim]
         x = self.patch_embedding(x)
+        B, C = x.shape[:2]
+
+        x = x.view(B, C, -1).permute(0, 2, 1).continuous()
         # transformer
         x = x + self.pos_embedding
         x = self.transformer(x)
