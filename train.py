@@ -305,6 +305,8 @@ def validate(device, val_loader, model, criterion):
 
             # measure accuracy and record loss
             acc1, acc5 = accuracy(output, target, topk=(1, 5))
+    # switch to train mode
+    model.train()
 
     return loss, acc1, acc5
 
