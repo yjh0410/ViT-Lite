@@ -237,7 +237,9 @@ def main():
                 continue
 
             # measure accuracy and record loss
-            acc1, acc5 = accuracy(output, target, topk=(1, 5))            
+            correct_1, correct_5 = accuracy(output, target, topk=(1, 5))
+            acc1 = correct_1.reshape(-1).float().sum(0, keepdim=True).mul_(100.0 / output.size(0))
+            acc5 = correct_5.reshape(-1).float().sum(0, keepdim=True).mul_(100.0 / output.size(0))
 
             # compute gradient and do SGD step
             optimizer.zero_grad()
@@ -272,10 +274,9 @@ def main():
 
         # evaluate
         print('evaluating ...')
-        loss, acc1, acc5 = validate(device, val_loader, model, criterion)
-        print('On val dataset: [loss: %.2f][acc1: %.2f][acc5: %.2f]' 
-                % (loss.item(), 
-                   acc1.item(), 
+        acc1, acc5 = validate(device, val_loader, model, criterion)
+        print('On val dataset: [acc1: %.2f][acc5: %.2f]' 
+                % (acc1.item(), 
                    acc5.item()),
                 flush=True)
 
@@ -294,7 +295,9 @@ def validate(device, val_loader, model, criterion):
     model.eval()
 
     with torch.no_grad():
-        end = time.time()
+        total_batch_size = len(val_loader)
+        correct_1 = []
+        correct_5 = []
         for i, (images, target) in enumerate(val_loader):
             images = images.to(device, non_blocking=True)
             target = target.to(device, non_blocking=True)
@@ -304,9 +307,13 @@ def validate(device, val_loader, model, criterion):
             loss = criterion(output, target)
 
             # measure accuracy and record loss
-            acc1, acc5 = accuracy(output, target, topk=(1, 5))
+            correct_1_, correct_5_ = accuracy(output, target, topk=(1, 5))
+            correct_1.append(correct_1_)
+            correct_5.append(correct_5_)
+        acc1 = torch.cat(correct_1).reshape(-1).float().sum(0, keepdim=True).mul_(100.0 / total_batch_size)
+        acc5 = torch.cat(correct_5).reshape(-1).float().sum(0, keepdim=True).mul_(100.0 / total_batch_size)
 
-    return loss, acc1, acc5
+    return acc1, acc5
 
 
 def set_lr(optimizer, lr):
@@ -318,7 +325,6 @@ def accuracy(output, target, topk=(1,)):
     """Computes the accuracy over the k top predictions for the specified values of k"""
     with torch.no_grad():
         maxk = max(topk)
-        batch_size = target.size(0)
 
         _, pred = output.topk(maxk, 1, True, True)
         pred = pred.t()
@@ -326,8 +332,8 @@ def accuracy(output, target, topk=(1,)):
 
         res = []
         for k in topk:
-            correct_k = correct[:k].reshape(-1).float().sum(0, keepdim=True)
-            res.append(correct_k.mul_(100.0 / batch_size))
+            correct_k = correct[:k]
+            res.append(correct_k)
         return res
 
 
