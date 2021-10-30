@@ -238,8 +238,8 @@ def main():
 
             # measure accuracy and record loss
             correct_1, correct_5 = accuracy(output, target, topk=(1, 5))
-            acc1 = correct_1.reshape(-1).float().sum(0, keepdim=True).mul_(100.0 / output.size(0))
-            acc5 = correct_5.reshape(-1).float().sum(0, keepdim=True).mul_(100.0 / output.size(0))
+            acc1 = correct_1.sum().mul_(100.0 / output.size(0))
+            acc5 = correct_5.sum().mul_(100.0 / output.size(0))
 
             # compute gradient and do SGD step
             optimizer.zero_grad()
@@ -310,8 +310,8 @@ def validate(device, val_loader, model, criterion):
             correct_1_, correct_5_ = accuracy(output, target, topk=(1, 5))
             correct_1.append(correct_1_)
             correct_5.append(correct_5_)
-        acc1 = torch.cat(correct_1).reshape(-1).float().sum(0, keepdim=True).mul_(100.0 / total_batch_size)
-        acc5 = torch.cat(correct_5).reshape(-1).float().sum(0, keepdim=True).mul_(100.0 / total_batch_size)
+        acc1 = torch.cat(correct_1).sum().mul_(100.0 / total_batch_size)
+        acc5 = torch.cat(correct_5).sum().mul_(100.0 / total_batch_size)
 
     return acc1, acc5
 
